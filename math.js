@@ -7,7 +7,6 @@ function openCalculator(mode, modeName) {
     document.getElementById('screen-2').style.display = 'flex';
     document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
     
-    // Dynamic Placeholder Text
     const inputElement = document.getElementById('math-input');
     if (mode === 'elimination') {
         inputElement.placeholder = "Paste system (e.g., -x+2y=-2 and 6x-y=-43)...";
@@ -57,11 +56,17 @@ function processQuery(query) {
         const sysMsg = document.createElement('div');
         sysMsg.className = 'message';
 
+        // --- NEW: Custom Copy Button Logic ---
         if (result.isError) {
             const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
             sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Math Parsing Failed) Ensure the format matches the current mode.`;
         } else {
-            sysMsg.innerHTML = `System:<br>${result.displayHTML} <button class="copy-btn" onclick="copyResult(this, '${result.copyText}')">📋 Copy Answer</button>`;
+            sysMsg.innerHTML = `System:<br>${result.displayHTML}`;
+            
+            // Only add the default copy button if hideDefaultCopy isn't true
+            if (!result.hideDefaultCopy) {
+                sysMsg.innerHTML += ` <button class="copy-btn" onclick="copyResult(this, '${result.copyText}')">📋 Copy Answer</button>`;
+            }
         }
         
         sysContainer.appendChild(sysMsg);
@@ -125,12 +130,10 @@ function parsePolynomialSide(str) {
     return { a, b, c };
 }
 
-// Helper to parse Ax + By = C linear equations
 function parseLinearEquation(eq) {
     let parts = eq.split('=');
     if (parts.length !== 2) return null;
     let left = parts[0];
-    // Evaluate the right side in case there are minus signs
     let rightStr = parts[1].replace(/[−–—]/g, '-').trim();
     let c = parseInt(rightStr);
 
@@ -164,9 +167,7 @@ function simplifyFraction(n, d) {
 
 function processMathUniversal(input, mode) {
     try {
-        // --- NEW: Elimination / Systems of Equations Logic ---
         if (mode === 'elimination') {
-            // Clean input: remove periods, replace "and" with a separator pipe "|", remove spaces
             let cleanStr = input.toLowerCase().replace(/\s+and\s+/g, '|').replace(/\./g, '').replace(/\s+/g, '').replace(/[−–—]/g, '-');
             let eqs = cleanStr.split('|');
             
@@ -177,9 +178,8 @@ function processMathUniversal(input, mode) {
 
             if (!eq1 || !eq2) return { isError: true };
 
-            // Cramer's Rule Determinants
             let D = (eq1.a * eq2.b) - (eq2.a * eq1.b);
-            if (D === 0) return { isError: true }; // Parallel or identical lines
+            if (D === 0) return { isError: true }; 
 
             let Dx = (eq1.c * eq2.b) - (eq2.c * eq1.b);
             let Dy = (eq1.a * eq2.c) - (eq2.a * eq1.c);
@@ -187,16 +187,16 @@ function processMathUniversal(input, mode) {
             let x = simplifyFraction(Dx, D);
             let y = simplifyFraction(Dy, D);
             
-            let coordinatePair = `(${x}, ${y})`;
-
+            // --- NEW: Injecting Two Copy Buttons ---
             return {
                 isError: false,
-                displayHTML: `System Solved:<br><span class="highlight-text">${coordinatePair}</span>`,
-                copyText: coordinatePair
+                hideDefaultCopy: true,
+                displayHTML: `System Solved:<br><span class="highlight-text">(${x}, ${y})</span><br><br>
+                <button class="copy-btn" onclick="copyResult(this, '${x}')">📋 Copy X</button> 
+                <button class="copy-btn" onclick="copyResult(this, '${y}')">📋 Copy Y</button>`
             };
         }
 
-        // --- Existing Quadratic Factoring Logic ---
         let expr = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/[−–—]/g, '-').replace(/x2/g, 'x^2');
         let parts = expr.split('=');
         
