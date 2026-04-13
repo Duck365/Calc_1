@@ -7,9 +7,11 @@ function openCalculator(mode, modeName) {
     document.getElementById('screen-2').style.display = 'flex';
     document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
     
-    // --- NEW: Dynamic Placeholder Text ---
+    // Dynamic Placeholder Text
     const inputElement = document.getElementById('math-input');
-    if (mode.startsWith('solve')) {
+    if (mode === 'elimination') {
+        inputElement.placeholder = "Paste system (e.g., -x+2y=-2 and 6x-y=-43)...";
+    } else if (mode.startsWith('solve')) {
         inputElement.placeholder = "Paste or type equation here... and press Enter";
     } else {
         inputElement.placeholder = "Paste or type expression here... and press Enter";
@@ -21,7 +23,7 @@ function openCalculator(mode, modeName) {
 function goBack() {
     document.getElementById('screen-2').style.display = 'none';
     document.getElementById('screen-1').style.display = 'flex';
-    document.getElementById('chat-box').innerHTML = ''; // Clear chat history on back
+    document.getElementById('chat-box').innerHTML = ''; 
     document.getElementById('math-input').value = '';
 }
 
@@ -100,7 +102,6 @@ function copyResult(button, text) {
 
 // --- ALGEBRAIC MATH ENGINE ---
 
-// Helper: Parses a single side of an equation into a, b, c variables
 function parsePolynomialSide(str) {
     let a = 0, b = 0, c = 0;
     if (!str.startsWith('-') && !str.startsWith('+')) str = '+' + str;
@@ -124,7 +125,31 @@ function parsePolynomialSide(str) {
     return { a, b, c };
 }
 
-// Helper: Simplify fractions so a>1 solutions look clean for DeltaMath
+// Helper to parse Ax + By = C linear equations
+function parseLinearEquation(eq) {
+    let parts = eq.split('=');
+    if (parts.length !== 2) return null;
+    let left = parts[0];
+    // Evaluate the right side in case there are minus signs
+    let rightStr = parts[1].replace(/[−–—]/g, '-').trim();
+    let c = parseInt(rightStr);
+
+    let a = 0, b = 0;
+    let terms = left.match(/([+-]?\d*[xy])/g);
+    if (!terms) return null;
+
+    terms.forEach(term => {
+        if (term.includes('x')) {
+            let val = term.replace('x', '');
+            a += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+        } else if (term.includes('y')) {
+            let val = term.replace('y', '');
+            b += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+        }
+    });
+    return { a, b, c };
+}
+
 function simplifyFraction(n, d) {
     if (n === 0) return "0";
     let sign = (n < 0) !== (d < 0) ? "-" : "";
@@ -137,9 +162,41 @@ function simplifyFraction(n, d) {
     return d === 1 ? `${sign}${n}` : `${sign}${n}/${d}`;
 }
 
-// Master Math Processor
 function processMathUniversal(input, mode) {
     try {
+        // --- NEW: Elimination / Systems of Equations Logic ---
+        if (mode === 'elimination') {
+            // Clean input: remove periods, replace "and" with a separator pipe "|", remove spaces
+            let cleanStr = input.toLowerCase().replace(/\s+and\s+/g, '|').replace(/\./g, '').replace(/\s+/g, '').replace(/[−–—]/g, '-');
+            let eqs = cleanStr.split('|');
+            
+            if (eqs.length !== 2) return { isError: true };
+
+            let eq1 = parseLinearEquation(eqs[0]);
+            let eq2 = parseLinearEquation(eqs[1]);
+
+            if (!eq1 || !eq2) return { isError: true };
+
+            // Cramer's Rule Determinants
+            let D = (eq1.a * eq2.b) - (eq2.a * eq1.b);
+            if (D === 0) return { isError: true }; // Parallel or identical lines
+
+            let Dx = (eq1.c * eq2.b) - (eq2.c * eq1.b);
+            let Dy = (eq1.a * eq2.c) - (eq2.a * eq1.c);
+
+            let x = simplifyFraction(Dx, D);
+            let y = simplifyFraction(Dy, D);
+            
+            let coordinatePair = `(${x}, ${y})`;
+
+            return {
+                isError: false,
+                displayHTML: `System Solved:<br><span class="highlight-text">${coordinatePair}</span>`,
+                copyText: coordinatePair
+            };
+        }
+
+        // --- Existing Quadratic Factoring Logic ---
         let expr = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/[−–—]/g, '-').replace(/x2/g, 'x^2');
         let parts = expr.split('=');
         
@@ -153,13 +210,11 @@ function processMathUniversal(input, mode) {
             c -= rhs.c;
         }
 
-        // Mode rule checking
         if (mode === 'factor_a1' || mode === 'solve_a1') {
             if (a !== 1) return { isError: true };
         }
         if (a === 0) return { isError: true }; 
 
-        // AC Method Factoring
         const gcdHelper = (x, y) => {
             x = Math.abs(x); y = Math.abs(y);
             while(y) { let t = y; y = x % y; x = t; }
@@ -219,11 +274,9 @@ function processMathUniversal(input, mode) {
         let gStr = g === 1 ? '' : (g === -1 ? '-' : g.toString());
         let factoredForm = `${gStr}${b1Str}${b2Str}`;
 
-        // Output Formatting
         if (mode.startsWith('solve')) {
-            // Calculate exact fraction solutions
             let discriminant = b*b - 4*a*c;
-            if (discriminant < 0) return { isError: true }; // No real solutions
+            if (discriminant < 0) return { isError: true }; 
             
             let sqrtD = Math.sqrt(discriminant);
             let n1 = -b + sqrtD;
