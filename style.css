@@ -1,0 +1,158 @@
+/* Base Theme */
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: #0d0d0d;
+    color: #39ff14;
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+}
+
+/* Screen Layouts */
+#screen-1, #screen-2 {
+    width: 100%;
+    height: 100%;
+    display: flex;
+}
+
+/* Screen 1 specific: Centered Menu */
+#screen-1 {
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.main-btn {
+    background-color: transparent;
+    color: #39ff14;
+    border: 2px solid #39ff14;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: 0.3s;
+    border-radius: 5px;
+    width: 450px;
+}
+
+.main-btn:hover {
+    background-color: #39ff14;
+    color: #000;
+}
+
+/* Screen 2 specific: Terminal Interface */
+#screen-2 {
+    display: none;
+    flex-direction: column;
+}
+
+/* Terminal Header with Back Button */
+.terminal-header {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px dashed #39ff14;
+    background-color: #050505;
+}
+
+.back-btn {
+    background-color: transparent;
+    color: #39ff14;
+    border: 1px solid #39ff14;
+    padding: 5px 15px;
+    font-size: 1rem;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-right: 20px;
+    transition: 0.2s;
+}
+
+.back-btn:hover {
+    background-color: #ff3333;
+    color: #fff;
+    border-color: #ff3333;
+}
+
+#mode-title {
+    font-weight: bold;
+    opacity: 0.8;
+    font-size: 1.1rem;
+}
+
+.chat-container {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.input-container {
+    padding: 20px;
+    border-top: 1px solid #39ff14;
+    background-color: #0d0d0d;
+}
+
+#math-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #39ff14;
+    font-family: inherit;
+    font-size: 1.2rem;
+    outline: none;
+}
+
+#math-input::placeholder {
+    color: rgba(57, 255, 20, 0.5); /* Faded green */
+}
+
+.message-row {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.message {
+    max-width: 100%;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+.error-text {
+    color: #ff3333;
+    font-weight: bold;
+}
+
+.highlight-text {
+    color: #fff;
+    font-weight: bold;
+}
+
+.copy-btn {
+    background: transparent;
+    border: 1px solid #39ff14;
+    color: #39ff14;
+    cursor: pointer;
+    margin-left: 10px;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: inherit;
+}
+
+.copy-btn:hover {
+    background: #39ff14;
+    color: #000;
+}
+
+.separator {
+    color: #39ff14;
+    opacity: 0.6;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
