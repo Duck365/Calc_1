@@ -10,6 +10,8 @@ function openCalculator(mode, modeName) {
     const inputElement = document.getElementById('math-input');
     if (mode === 'elimination' || mode === 'substitution') {
         inputElement.placeholder = "Paste system of equations here...";
+    } else if (mode === 'distribute' || mode === 'fractions') {
+        inputElement.placeholder = "Paste linear equation here...";
     } else {
         inputElement.placeholder = "Paste or type expression here... and press Enter";
     }
@@ -115,58 +117,80 @@ function simplifyFraction(n, d) {
     return d === 1 ? `${sign}${n}` : `${sign}${n}/${d}`;
 }
 
+// Convert decimals to exact fractions
+function toFraction(decimal) {
+    if (decimal % 1 === 0) return decimal.toString();
+    const tolerance = 1.0E-6;
+    let sign = decimal < 0 ? "-" : "";
+    let x = Math.abs(decimal);
+    for (let i = 1; i <= 1000; i++) {
+        let num = Math.round(x * i);
+        if (Math.abs((num / i) - x) < tolerance) {
+            return sign + num + "/" + i;
+        }
+    }
+    return Number(decimal.toFixed(4)).toString(); 
+}
+
+// Evaluates x values for linear equations
+function evaluateSide(expr, xValue) {
+    let jsExpr = expr
+        .replace(/([0-9])([a-zA-Z\(])/g, "$1*$2") 
+        .replace(/\)([\w\(])/g, ")*$1")           
+        .replace(/([a-zA-Z])([0-9\(\)])/g, "$1*$2"); 
+    jsExpr = jsExpr.replace(/x/g, `(${xValue})`);
+    try {
+        return Function(`"use strict"; return (${jsExpr})`)();
+    } catch (e) {
+        return null;
+    }
+}
+
+// Cleans up DeltaMath's broken fraction formatting
+function sanitizeDeltaMathInput(input) {
+    let cleaned = input.replace(/(\d+)\n\n(\d+)\n/g, "$2/$1"); // fixes 1\n\n2\n to 2/1 (which represents 1/2)
+    cleaned = cleaned.replace(/[\u200B-\u200D\uFEFF\s]/g, "");
+    cleaned = cleaned.replace(/[−–—]/g, "-");
+    return cleaned;
+}
+
 function processMathUniversal(input, mode) {
     try {
-        // --- NEW: Linear Equations with Distribution ---
-        if (mode === 'distribute') {
-            let eq = input.replace(/[−–—]/g, '-').replace(/\s+/g, '');
+        // --- NEW: Linear Equations w/ Distribution & Fractions ---
+        if (mode === 'distribute' || mode === 'fractions') {
+            let eq = mode === 'fractions' ? sanitizeDeltaMathInput(input) : input.replace(/[−–—]/g, '-').replace(/\s+/g, '');
             let parts = eq.split('=');
             if (parts.length !== 2) return { isError: true };
-
-            function evalSide(expr, x_val) {
-                let jsExpr = expr.replace(/([0-9])x/g, '$1*x'); // "6x" -> "6*x"
-                jsExpr = jsExpr.replace(/x/g, `(${x_val})`);    // "x" -> "(val)"
-                jsExpr = jsExpr.replace(/([0-9])\(/g, '$1*(');  // "3(" -> "3*("
-                jsExpr = jsExpr.replace(/\)\(/g, ')*(');        // ")(" -> ")*("
-                try {
-                    return Function(`"use strict"; return (${jsExpr})`)();
-                } catch(e) {
-                    return NaN;
-                }
-            }
             
-            let l0 = evalSide(parts[0], 0);
-            let l1 = evalSide(parts[0], 1);
-            let r0 = evalSide(parts[1], 0);
-            let r1 = evalSide(parts[1], 1);
+            let L0 = evaluateSide(parts[0], 0);
+            let R0 = evaluateSide(parts[1], 0);
+            if (L0 === null || R0 === null) return { isError: true };
+            let b = L0 - R0;
             
-            if (isNaN(l0) || isNaN(l1) || isNaN(r0) || isNaN(r1)) return { isError: true };
+            let L1 = evaluateSide(parts[0], 1);
+            let R1 = evaluateSide(parts[1], 1);
+            let m = (L1 - R1) - b;
             
-            let M = (l1 - r1) - (l0 - r0);
-            let C = l0 - r0;
+            if (m === 0) return { isError: true };
             
-            if (M === 0) return { isError: true };
-            
-            let x = simplifyFraction(Math.round(-C), Math.round(M));
+            let xVal = -b / m;
+            let finalX = toFraction(xVal);
             
             return {
                 isError: false,
                 hideDefaultCopy: false,
-                displayHTML: `Linear Solved:<br><span class="highlight-text">x = ${x}</span>`,
-                copyText: x
+                displayHTML: `Linear Solved:<br><span class="highlight-text">x = ${finalX}</span>`,
+                copyText: finalX
             };
         }
 
-        // --- UPDATED: Elimination & Substitution ---
+        // --- Elimination & Substitution ---
         if (mode === 'elimination' || mode === 'substitution') {
-            // Aggressively clean out DeltaMath screen-reader junk
             let cleanStr = input.replace(/[−–—]/g, '-').replace(/\s*=\s*/g, '=');
             let strParts = cleanStr.split(/\s+/);
             
-            // Filter to only strings that contain "=" and do NOT contain words or commas
             let eqsStr = strParts.filter(p => p.includes('=') && !/[a-z]{2,}/i.test(p) && !p.includes(','));
             
-            // Fallback for typed "eq1 and eq2"
             if (eqsStr.length < 2) {
                 let alt = input.toLowerCase().replace(/\s+and\s+/g, '|').replace(/\s+/g, '').replace(/[−–—]/g, '-');
                 eqsStr = alt.split('|');
@@ -227,7 +251,7 @@ function processMathUniversal(input, mode) {
             };
         }
 
-        // --- Existing Quadratic Logic ---
+        // --- Quadratics (Factoring and Solving) ---
         function parsePolynomialSide(str) {
             let a = 0, b = 0, c = 0;
             if (!str.startsWith('-') && !str.startsWith('+')) str = '+' + str;
