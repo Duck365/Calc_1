@@ -10,9 +10,9 @@
             margin: 0;
             padding: 0;
             height: 100%;
-            background-color: #0d0d0d; /* Deep Black */
-            color: #39ff14; /* Neon Green */
-            font-family: 'Courier New', Courier, monospace; /* Coding font */
+            background-color: #0d0d0d;
+            color: #39ff14;
+            font-family: 'Courier New', Courier, monospace;
             overflow: hidden;
         }
 
@@ -28,7 +28,7 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            gap: 20px; /* Space between the buttons */
+            gap: 20px;
         }
 
         .main-btn {
@@ -41,7 +41,7 @@
             cursor: pointer;
             transition: 0.3s;
             border-radius: 5px;
-            width: 350px;
+            width: 400px;
         }
 
         .main-btn:hover {
@@ -51,8 +51,42 @@
 
         /* Screen 2 specific: Terminal Interface */
         #screen-2 {
-            display: none; /* Hidden initially */
+            display: none;
             flex-direction: column;
+        }
+
+        /* Terminal Header with Back Button */
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px dashed #39ff14;
+            background-color: #050505;
+        }
+
+        .back-btn {
+            background-color: transparent;
+            color: #39ff14;
+            border: 1px solid #39ff14;
+            padding: 5px 15px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-right: 20px;
+            transition: 0.2s;
+        }
+
+        .back-btn:hover {
+            background-color: #ff3333; /* Red hover for exiting */
+            color: #fff;
+            border-color: #ff3333;
+        }
+
+        #mode-title {
+            font-weight: bold;
+            opacity: 0.8;
+            font-size: 1.1rem;
         }
 
         .chat-container {
@@ -61,7 +95,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 10px; /* Tighter gap for terminal feel */
+            gap: 10px;
         }
 
         .input-container {
@@ -84,7 +118,6 @@
             color: rgba(57, 255, 20, 0.5);
         }
 
-        /* Message Styling - All Left Aligned */
         .message-row {
             display: flex;
             width: 100%;
@@ -97,9 +130,13 @@
             line-height: 1.5;
         }
 
-        /* Error Styling */
         .error-text {
-            color: #ff3333; /* Red color for errors */
+            color: #ff3333;
+            font-weight: bold;
+        }
+
+        .highlight-text {
+            color: #fff;
             font-weight: bold;
         }
 
@@ -126,25 +163,21 @@
             margin-bottom: 10px;
             font-size: 1rem;
         }
-        
-        .mode-indicator {
-            color: #39ff14;
-            opacity: 0.8;
-            margin-bottom: 15px;
-            font-weight: bold;
-            border-bottom: 1px dashed #39ff14;
-            padding-bottom: 5px;
-        }
     </style>
 </head>
 <body>
 
     <div id="screen-1">
-        <button class="main-btn" onclick="openCalculator('a=1')">Factoring Trinomials (a=1)</button>
-        <button class="main-btn" onclick="openCalculator('a>1')">Factoring Trinomials (a>1)</button>
+        <button class="main-btn" onclick="openCalculator('factor_a1', 'Factoring Trinomials (a=1)')">Factoring Trinomials (a=1)</button>
+        <button class="main-btn" onclick="openCalculator('factor_agt1', 'Factoring Trinomials (a>1)')">Factoring Trinomials (a>1)</button>
+        <button class="main-btn" onclick="openCalculator('solve_a1', 'Solve by Trinomial Factor (a=1)')">Solve by Trinomial Factor (a=1)</button>
     </div>
 
     <div id="screen-2">
+        <div class="terminal-header">
+            <button class="back-btn" onclick="goBack()">⬅ Back</button>
+            <div id="mode-title">Mode initialized...</div>
+        </div>
         <div class="chat-container" id="chat-box">
             </div>
         <div class="input-container">
@@ -155,34 +188,36 @@
     <script>
         let currentMode = '';
 
-        // Switch from Screen 1 to Screen 2
-        function openCalculator(mode) {
+        // UI Navigation
+        function openCalculator(mode, modeName) {
             currentMode = mode;
             document.getElementById('screen-1').style.display = 'none';
             document.getElementById('screen-2').style.display = 'flex';
-            
-            // Add a header to the terminal so we know what mode we are in
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = `<div class="mode-indicator">Mode initialized: Factoring Trinomials (${mode})</div>`;
-            
+            document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
             document.getElementById('math-input').focus();
         }
 
+        function goBack() {
+            document.getElementById('screen-2').style.display = 'none';
+            document.getElementById('screen-1').style.display = 'flex';
+            document.getElementById('chat-box').innerHTML = ''; // Clear chat history on back
+            document.getElementById('math-input').value = '';
+        }
+
+        // Input Handling
         const inputField = document.getElementById('math-input');
         const chatBox = document.getElementById('chat-box');
 
-        // Automatically format typed ^2 to ²
         inputField.addEventListener('input', function() {
             this.value = this.value.replace(/\^2/g, '²');
         });
 
-        // Listen for the Enter key
         inputField.addEventListener('keydown', function(event) {
             if (event.key === 'Enter') {
                 const query = this.value.trim();
                 if (query === '') return;
                 
-                this.value = ''; // clear box
+                this.value = '';
                 processQuery(query);
             }
         });
@@ -192,7 +227,7 @@
             appendMessage(`System: Thinking...`);
 
             setTimeout(() => {
-                const result = factorTrinomialUniversal(query, currentMode);
+                const result = processMathUniversal(query, currentMode);
                 
                 const sysContainer = document.createElement('div');
                 sysContainer.className = 'message-row';
@@ -201,15 +236,14 @@
 
                 if (result.isError) {
                     const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
-                    sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Invalid Expression) Please type or paste a valid expression.`;
+                    sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Math Parsing Failed) Ensure the format matches the current mode.`;
                 } else {
-                    sysMsg.innerHTML = `System: ${result.answer} <button class="copy-btn" onclick="copyResult(this, '${result.answer.replace(/\\/g, '\\\\')}')">📋 Copy</button>`;
+                    sysMsg.innerHTML = `System:<br>${result.displayHTML} <button class="copy-btn" onclick="copyResult(this, '${result.copyText}')">📋 Copy Answer</button>`;
                 }
                 
                 sysContainer.appendChild(sysMsg);
                 chatBox.appendChild(sysContainer);
                 
-                // Add separator line
                 const separatorRow = document.createElement('div');
                 separatorRow.className = 'message-row';
                 const separator = document.createElement('div');
@@ -233,7 +267,6 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Copy logic
         function copyResult(button, text) {
             navigator.clipboard.writeText(text).then(() => {
                 const originalText = button.innerHTML;
@@ -244,69 +277,77 @@
             });
         }
 
-        // Universal Factoring Logic (Handles a=1 and a>1 utilizing the AC Method)
-        function factorTrinomialUniversal(input, mode) {
+        // --- NEW ALGEBRAIC MATH ENGINE ---
+
+        // Helper: Parses a single side of an equation into a, b, c variables
+        function parsePolynomialSide(str) {
+            let a = 0, b = 0, c = 0;
+            // Add leading + for easier regex matching if no sign is present
+            if (!str.startsWith('-') && !str.startsWith('+')) str = '+' + str;
+            
+            // Match terms like +x^2, -5x, +10
+            const termRegex = /([+-]\d*x\^2|[+-]\d*x(?!\^2)|[+-]\d+)/g;
+            let matches = str.match(termRegex);
+            
+            if (matches) {
+                matches.forEach(term => {
+                    if (term.includes('x^2')) {
+                        let val = term.replace('x^2', '');
+                        a += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+                    } else if (term.includes('x')) {
+                        let val = term.replace('x', '');
+                        b += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+                    } else {
+                        c += parseInt(term);
+                    }
+                });
+            }
+            return { a, b, c };
+        }
+
+        // Master Math Processor
+        function processMathUniversal(input, mode) {
             try {
-                // 1. Clean up the string (handles new lines, special minus signs, and drops the 2 down to ^2)
-                let expr = input.replace(/\s+/g, '').replace('²', '^2');
-                expr = expr.replace(/[−–—]/g, '-');
-                expr = expr.replace(/x2/g, 'x^2'); // Turns 6x2 into 6x^2
+                // 1. Clean the string
+                let expr = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/[−–—]/g, '-').replace(/x2/g, 'x^2');
 
-                // Extract 'a'
-                let aMatch = expr.match(/^([+-]?\d*)x\^2/);
-                if (!aMatch) return { isError: true };
+                // 2. Split by '=' to handle equations
+                let parts = expr.split('=');
                 
-                let aStr = aMatch[1];
-                let a = 1;
-                if (aStr === '-') a = -1;
-                else if (aStr !== '' && aStr !== '+') a = parseInt(aStr);
+                // 3. Parse Left Side
+                let lhs = parsePolynomialSide(parts[0]);
+                let a = lhs.a, b = lhs.b, c = lhs.c;
 
-                // Enforce mode rules
-                if (mode === 'a=1' && Math.abs(a) !== 1) return { isError: true };
-
-                expr = expr.substring(aMatch[0].length);
-
-                // Extract 'b'
-                let bMatch = expr.match(/^([+-]?\d*)x/);
-                let b = 0;
-                if (bMatch) {
-                    let bStr = bMatch[1];
-                    if (bStr === '+' || bStr === '') b = 1;
-                    else if (bStr === '-') b = -1;
-                    else b = parseInt(bStr);
-                    expr = expr.substring(bMatch[0].length);
+                // 4. Parse Right Side and algebraically move it to the left side (subtract it)
+                if (parts.length > 1) {
+                    let rhs = parsePolynomialSide(parts[1]);
+                    a -= rhs.a;
+                    b -= rhs.b;
+                    c -= rhs.c;
                 }
 
-                // Extract 'c'
-                let c = 0;
-                if (expr.length > 0) {
-                    c = parseInt(expr);
+                // Verify rules based on mode
+                if (mode === 'factor_a1' || mode === 'solve_a1') {
+                    if (a !== 1) return { isError: true };
                 }
-                if (isNaN(c)) return { isError: true };
+                if (a === 0) return { isError: true }; // Not a quadratic
 
-                // Greatest Common Divisor Helper
+                // 5. Factoring Math (AC Method)
                 const gcd = (x, y) => {
                     x = Math.abs(x); y = Math.abs(y);
                     while(y) { let t = y; y = x % y; x = t; }
                     return x;
                 };
 
-                // Pull out the Greatest Common Factor of the whole trinomial
                 let g = gcd(a, gcd(b, c));
                 if (a < 0) g = -g; 
                 
-                let a1 = a / g;
-                let b1 = b / g;
-                let c1 = c / g;
-
-                // AC Method setup
-                let targetMult = a1 * c1;
-                let targetAdd = b1;
+                let a1 = a / g, b1 = b / g, c1 = c / g;
+                let targetMult = a1 * c1, targetAdd = b1;
                 let f1 = null, f2 = null;
 
                 if (targetMult === 0) {
-                    f1 = targetAdd;
-                    f2 = 0;
+                    f1 = targetAdd; f2 = 0;
                 } else {
                     let limit = Math.abs(targetMult);
                     for (let i = -limit; i <= limit; i++) {
@@ -320,19 +361,14 @@
                     }
                 }
 
-                // If no factors are found, it's prime
                 if (f1 === null) return { isError: true };
 
-                // Divide binomials by their internal GCFs to simplify
                 let gcd1 = gcd(a1, f1);
-                let t1_a = a1 / gcd1;
-                let t1_c = f1 / gcd1;
+                let t1_a = a1 / gcd1, t1_c = f1 / gcd1;
 
                 let gcd2 = gcd(a1, f2);
-                let t2_a = a1 / gcd2;
-                let t2_c = f2 / gcd2;
+                let t2_a = a1 / gcd2, t2_c = f2 / gcd2;
 
-                // Formatting function for binomials
                 const formatBin = (coef, cnst) => {
                     if (coef === 0 && cnst === 0) return '';
                     let xT = coef === 1 ? 'x' : (coef === -1 ? '-x' : `${coef}x`);
@@ -346,20 +382,36 @@
                 let b1Str = formatBin(t1_a, t1_c);
                 let b2Str = formatBin(t2_a, t2_c);
                 
-                // Clean up single X terms without parentheses
                 if (t1_a === 1 && t1_c === 0) b1Str = 'x';
                 if (t2_a === 1 && t2_c === 0) b2Str = 'x';
-                if (t1_a !== 1 && t1_c === 0) b1Str = `${t1_a}x`;
-                if (t2_a !== 1 && t2_c === 0) b2Str = `${t2_a}x`;
-
-                // Arrange so standalone terms sit on the left (e.g. x(x-4) instead of (x-4)x )
+                
                 if (b1Str.startsWith('(') && !b2Str.startsWith('(')) {
                     let temp = b1Str; b1Str = b2Str; b2Str = temp;
                 }
 
                 let gStr = g === 1 ? '' : (g === -1 ? '-' : g.toString());
+                let factoredForm = `${gStr}${b1Str}${b2Str}`;
 
-                return { isError: false, answer: `${gStr}${b1Str}${b2Str}` };
+                // 6. Output Formatting Based on Mode
+                if (mode.startsWith('solve')) {
+                    // Extract exact mathematical solutions
+                    let root1 = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
+                    let root2 = (-b - Math.sqrt(b*b - 4*a*c)) / (2*a);
+                    
+                    let solutions = (root1 === root2) ? `${root1}` : `${root1}, ${root2}`;
+                    
+                    return { 
+                        isError: false, 
+                        displayHTML: `Factored: ${factoredForm} = 0<br>Solutions: <span class="highlight-text">x = ${solutions}</span>`, 
+                        copyText: solutions 
+                    };
+                } else {
+                    return { 
+                        isError: false, 
+                        displayHTML: `<span class="highlight-text">${factoredForm}</span>`, 
+                        copyText: factoredForm.replace(/\\/g, '\\\\') 
+                    };
+                }
                 
             } catch(e) {
                 return { isError: true };
