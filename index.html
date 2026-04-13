@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calc_1</title>
+    <style>
+        /* Base Theme */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #0d0d0d; /* Deep Black */
+            color: #39ff14; /* Neon Green */
+            font-family: 'Courier New', Courier, monospace; /* Coding font */
+            overflow: hidden;
+        }
+
+        /* Screen Layouts */
+        #screen-1, #screen-2 {
+            width: 100%;
+            height: 100%;
+            display: flex;
+        }
+
+        /* Screen 1 specific: Centered Button */
+        #screen-1 {
+            justify-content: center;
+            align-items: center;
+        }
+
+        .main-btn {
+            background-color: transparent;
+            color: #39ff14;
+            border: 2px solid #39ff14;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: 0.3s;
+            border-radius: 5px;
+        }
+
+        .main-btn:hover {
+            background-color: #39ff14;
+            color: #000;
+        }
+
+        /* Screen 2 specific: Chat Interface */
+        #screen-2 {
+            display: none; /* Hidden initially */
+            flex-direction: column;
+        }
+
+        .chat-container {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .input-container {
+            padding: 20px;
+            border-top: 1px solid #39ff14;
+            background-color: #0d0d0d;
+        }
+
+        #math-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: #39ff14;
+            font-family: inherit;
+            font-size: 1.2rem;
+            outline: none;
+        }
+
+        #math-input::placeholder {
+            color: rgba(57, 255, 20, 0.5);
+        }
+
+        /* Message Styling */
+        .message-row {
+            display: flex;
+            width: 100%;
+        }
+
+        .message-row.user {
+            justify-content: flex-end;
+        }
+
+        .message-row.system {
+            justify-content: flex-start;
+            flex-direction: column;
+        }
+
+        .message {
+            max-width: 80%;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #39ff14;
+            color: #39ff14;
+            cursor: pointer;
+            margin-left: 10px;
+            border-radius: 3px;
+            padding: 2px 6px;
+        }
+
+        .copy-btn:hover {
+            background: #39ff14;
+            color: #000;
+        }
+
+        .separator {
+            color: #39ff14;
+            opacity: 0.6;
+            margin-top: 5px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="screen-1">
+        <button class="main-btn" onclick="openCalculator()">Factoring Trinomials (a=1)</button>
+    </div>
+
+    <div id="screen-2">
+        <div class="chat-container" id="chat-box">
+            </div>
+        <div class="input-container">
+            <input type="text" id="math-input" placeholder="Paste or type expression here... (e.g., x^2 - 2x - 80) and press Enter" autocomplete="off">
+        </div>
+    </div>
+
+    <script>
+        // Switch from Screen 1 to Screen 2
+        function openCalculator() {
+            document.getElementById('screen-1').style.display = 'none';
+            document.getElementById('screen-2').style.display = 'flex';
+            document.getElementById('math-input').focus();
+        }
+
+        const inputField = document.getElementById('math-input');
+        const chatBox = document.getElementById('chat-box');
+
+        // Automatically format ^2 to ² as the user types or pastes
+        inputField.addEventListener('input', function() {
+            this.value = this.value.replace(/\^2/g, '²');
+        });
+
+        // Listen for the Enter key
+        inputField.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                const query = this.value.trim();
+                if (query === '') return;
+                
+                this.value = ''; // clear box
+                processQuery(query);
+            }
+        });
+
+        function processQuery(query) {
+            // 1. Show User Input (Top Right)
+            appendMessage(`User: ${query}`, 'user');
+
+            // 2. Show "System: Thinking..."
+            const sysContainer = document.createElement('div');
+            sysContainer.className = 'message-row system';
+            const sysMsg = document.createElement('div');
+            sysMsg.className = 'message';
+            sysMsg.innerText = 'System: Thinking...';
+            sysContainer.appendChild(sysMsg);
+            chatBox.appendChild(sysContainer);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // 3. Calculate answer and update after a short delay for effect
+            setTimeout(() => {
+                const answer = factorTrinomial(query);
+                
+                // Update text to answer and add copy button
+                sysMsg.innerHTML = `System: ${answer} <button class="copy-btn" onclick="copyResult(this, '${answer}')">📋 Copy</button>`;
+                
+                // Add separator
+                const separator = document.createElement('div');
+                separator.className = 'separator';
+                separator.innerText = '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~';
+                sysContainer.appendChild(separator);
+
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 800); // 800ms delay
+        }
+
+        function appendMessage(text, sender) {
+            const row = document.createElement('div');
+            row.className = `message-row ${sender}`;
+            const msg = document.createElement('div');
+            msg.className = 'message';
+            msg.innerText = text;
+            row.appendChild(msg);
+            chatBox.appendChild(row);
+        }
+
+        // Copy logic
+        function copyResult(button, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        // Math Logic for Factoring a=1 Trinomials
+        function factorTrinomial(input) {
+            try {
+                // Normalize string: remove spaces and treat ² as ^2
+                let expr = input.replace(/\s+/g, '').replace('²', '^2');
+
+                if (!expr.startsWith('x^2')) {
+                    return "Error: Could not parse. Ensure it starts with x^2 (and a=1).";
+                }
+
+                // Strip 'x^2' to isolate bx + c
+                expr = expr.substring(3); 
+                
+                let b = 0;
+                let c = 0;
+
+                // Match the 'x' term
+                let bMatch = expr.match(/^[+-]?\d*x/);
+                if (bMatch) {
+                    let bStr = bMatch[0].replace('x', '');
+                    if (bStr === '+' || bStr === '') b = 1;
+                    else if (bStr === '-') b = -1;
+                    else b = parseInt(bStr);
+                    
+                    expr = expr.substring(bMatch[0].length); // Remove the bx part
+                }
+
+                // Match the constant term
+                if (expr.length > 0) {
+                    c = parseInt(expr);
+                }
+
+                // Factoring Logic
+                if (c === 0) {
+                    return `x(x ${b >= 0 ? '+' : '-'} ${Math.abs(b)})`;
+                }
+
+                for (let i = -Math.abs(c); i <= Math.abs(c); i++) {
+                    if (i === 0) continue;
+                    if (c % i === 0) {
+                        let j = c / i;
+                        if (i + j === b) {
+                            let term1 = i >= 0 ? `+ ${i}` : `- ${Math.abs(i)}`;
+                            let term2 = j >= 0 ? `+ ${j}` : `- ${Math.abs(j)}`;
+                            return `(x ${term1})(x ${term2})`;
+                        }
+                    }
+                }
+                return "Cannot be factored with real integers.";
+            } catch (err) {
+                return "Error solving expression.";
+            }
+        }
+    </script>
+</body>
+</html>
