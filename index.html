@@ -235,6 +235,9 @@
                 // Remove ALL spaces to fix weird Delta Math copy-pasting
                 let expr = input.replace(/\s+/g, '').replace('²', '^2');
 
+                // NEW FIX: Replace DeltaMath's typographical minus signs with standard hyphens
+                expr = expr.replace(/[−–—]/g, '-');
+
                 // If it pastes as "x2", convert it to "x^2"
                 if (expr.startsWith('x2')) {
                     expr = expr.replace(/^x2/, 'x^2');
