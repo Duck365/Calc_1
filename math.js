@@ -6,7 +6,16 @@ function openCalculator(mode, modeName) {
     document.getElementById('screen-1').style.display = 'none';
     document.getElementById('screen-2').style.display = 'flex';
     document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
-    document.getElementById('math-input').focus();
+    
+    // --- NEW: Dynamic Placeholder Text ---
+    const inputElement = document.getElementById('math-input');
+    if (mode.startsWith('solve')) {
+        inputElement.placeholder = "Paste or type equation here... and press Enter";
+    } else {
+        inputElement.placeholder = "Paste or type expression here... and press Enter";
+    }
+    
+    inputElement.focus();
 }
 
 function goBack() {
