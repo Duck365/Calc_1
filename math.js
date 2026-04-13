@@ -8,10 +8,8 @@ function openCalculator(mode, modeName) {
     document.getElementById('mode-title').innerText = `MODE: ${modeName}`;
     
     const inputElement = document.getElementById('math-input');
-    if (mode === 'elimination') {
-        inputElement.placeholder = "Paste system (e.g., -x+2y=-2 and 6x-y=-43)...";
-    } else if (mode.startsWith('solve')) {
-        inputElement.placeholder = "Paste or type equation here... and press Enter";
+    if (mode === 'elimination' || mode === 'substitution') {
+        inputElement.placeholder = "Paste system of equations here...";
     } else {
         inputElement.placeholder = "Paste or type expression here... and press Enter";
     }
@@ -56,14 +54,12 @@ function processQuery(query) {
         const sysMsg = document.createElement('div');
         sysMsg.className = 'message';
 
-        // --- NEW: Custom Copy Button Logic ---
         if (result.isError) {
             const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
             sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Math Parsing Failed) Ensure the format matches the current mode.`;
         } else {
             sysMsg.innerHTML = `System:<br>${result.displayHTML}`;
             
-            // Only add the default copy button if hideDefaultCopy isn't true
             if (!result.hideDefaultCopy) {
                 sysMsg.innerHTML += ` <button class="copy-btn" onclick="copyResult(this, '${result.copyText}')">📋 Copy Answer</button>`;
             }
@@ -107,52 +103,6 @@ function copyResult(button, text) {
 
 // --- ALGEBRAIC MATH ENGINE ---
 
-function parsePolynomialSide(str) {
-    let a = 0, b = 0, c = 0;
-    if (!str.startsWith('-') && !str.startsWith('+')) str = '+' + str;
-    
-    const termRegex = /([+-]\d*x\^2|[+-]\d*x(?!\^2)|[+-]\d+)/g;
-    let matches = str.match(termRegex);
-    
-    if (matches) {
-        matches.forEach(term => {
-            if (term.includes('x^2')) {
-                let val = term.replace('x^2', '');
-                a += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
-            } else if (term.includes('x')) {
-                let val = term.replace('x', '');
-                b += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
-            } else {
-                c += parseInt(term);
-            }
-        });
-    }
-    return { a, b, c };
-}
-
-function parseLinearEquation(eq) {
-    let parts = eq.split('=');
-    if (parts.length !== 2) return null;
-    let left = parts[0];
-    let rightStr = parts[1].replace(/[−–—]/g, '-').trim();
-    let c = parseInt(rightStr);
-
-    let a = 0, b = 0;
-    let terms = left.match(/([+-]?\d*[xy])/g);
-    if (!terms) return null;
-
-    terms.forEach(term => {
-        if (term.includes('x')) {
-            let val = term.replace('x', '');
-            a += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
-        } else if (term.includes('y')) {
-            let val = term.replace('y', '');
-            b += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
-        }
-    });
-    return { a, b, c };
-}
-
 function simplifyFraction(n, d) {
     if (n === 0) return "0";
     let sign = (n < 0) !== (d < 0) ? "-" : "";
@@ -167,14 +117,95 @@ function simplifyFraction(n, d) {
 
 function processMathUniversal(input, mode) {
     try {
-        if (mode === 'elimination') {
-            let cleanStr = input.toLowerCase().replace(/\s+and\s+/g, '|').replace(/\./g, '').replace(/\s+/g, '').replace(/[−–—]/g, '-');
-            let eqs = cleanStr.split('|');
-            
-            if (eqs.length !== 2) return { isError: true };
+        // --- NEW: Linear Equations with Distribution ---
+        if (mode === 'distribute') {
+            let eq = input.replace(/[−–—]/g, '-').replace(/\s+/g, '');
+            let parts = eq.split('=');
+            if (parts.length !== 2) return { isError: true };
 
-            let eq1 = parseLinearEquation(eqs[0]);
-            let eq2 = parseLinearEquation(eqs[1]);
+            function evalSide(expr, x_val) {
+                let jsExpr = expr.replace(/([0-9])x/g, '$1*x'); // "6x" -> "6*x"
+                jsExpr = jsExpr.replace(/x/g, `(${x_val})`);    // "x" -> "(val)"
+                jsExpr = jsExpr.replace(/([0-9])\(/g, '$1*(');  // "3(" -> "3*("
+                jsExpr = jsExpr.replace(/\)\(/g, ')*(');        // ")(" -> ")*("
+                try {
+                    return Function(`"use strict"; return (${jsExpr})`)();
+                } catch(e) {
+                    return NaN;
+                }
+            }
+            
+            let l0 = evalSide(parts[0], 0);
+            let l1 = evalSide(parts[0], 1);
+            let r0 = evalSide(parts[1], 0);
+            let r1 = evalSide(parts[1], 1);
+            
+            if (isNaN(l0) || isNaN(l1) || isNaN(r0) || isNaN(r1)) return { isError: true };
+            
+            let M = (l1 - r1) - (l0 - r0);
+            let C = l0 - r0;
+            
+            if (M === 0) return { isError: true };
+            
+            let x = simplifyFraction(Math.round(-C), Math.round(M));
+            
+            return {
+                isError: false,
+                hideDefaultCopy: false,
+                displayHTML: `Linear Solved:<br><span class="highlight-text">x = ${x}</span>`,
+                copyText: x
+            };
+        }
+
+        // --- UPDATED: Elimination & Substitution ---
+        if (mode === 'elimination' || mode === 'substitution') {
+            // Aggressively clean out DeltaMath screen-reader junk
+            let cleanStr = input.replace(/[−–—]/g, '-').replace(/\s*=\s*/g, '=');
+            let strParts = cleanStr.split(/\s+/);
+            
+            // Filter to only strings that contain "=" and do NOT contain words or commas
+            let eqsStr = strParts.filter(p => p.includes('=') && !/[a-z]{2,}/i.test(p) && !p.includes(','));
+            
+            // Fallback for typed "eq1 and eq2"
+            if (eqsStr.length < 2) {
+                let alt = input.toLowerCase().replace(/\s+and\s+/g, '|').replace(/\s+/g, '').replace(/[−–—]/g, '-');
+                eqsStr = alt.split('|');
+            }
+            
+            if (eqsStr.length !== 2) return { isError: true };
+
+            function standardizeLinear(eq) {
+                let splitEq = eq.split('=');
+                if(splitEq.length !== 2) return null;
+                let left = splitEq[0], right = splitEq[1];
+                let a = 0, b = 0, c = 0;
+                
+                function parseExpr(expr, multiplier) {
+                    expr = expr.replace(/(^[+-]?|[+-])/g, " $1").trim(); 
+                    if (!expr) return;
+                    let terms = expr.split(/\s+/);
+                    terms.forEach(term => {
+                        if (term.includes('x')) {
+                            let val = term.replace('x', '');
+                            a += (val === '+' || val === '') ? multiplier : (val === '-' ? -multiplier : parseInt(val) * multiplier);
+                        } else if (term.includes('y')) {
+                            let val = term.replace('y', '');
+                            b += (val === '+' || val === '') ? multiplier : (val === '-' ? -multiplier : parseInt(val) * multiplier);
+                        } else {
+                            if(term !== '+' && term !== '-' && term !== '') {
+                                c += parseInt(term) * multiplier;
+                            }
+                        }
+                    });
+                }
+                
+                parseExpr(left, 1);
+                parseExpr(right, -1);
+                return { a, b, c: -c }; 
+            }
+
+            let eq1 = standardizeLinear(eqsStr[0]);
+            let eq2 = standardizeLinear(eqsStr[1]);
 
             if (!eq1 || !eq2) return { isError: true };
 
@@ -187,7 +218,6 @@ function processMathUniversal(input, mode) {
             let x = simplifyFraction(Dx, D);
             let y = simplifyFraction(Dy, D);
             
-            // --- NEW: Injecting Two Copy Buttons ---
             return {
                 isError: false,
                 hideDefaultCopy: true,
@@ -195,6 +225,30 @@ function processMathUniversal(input, mode) {
                 <button class="copy-btn" onclick="copyResult(this, '${x}')">📋 Copy X</button> 
                 <button class="copy-btn" onclick="copyResult(this, '${y}')">📋 Copy Y</button>`
             };
+        }
+
+        // --- Existing Quadratic Logic ---
+        function parsePolynomialSide(str) {
+            let a = 0, b = 0, c = 0;
+            if (!str.startsWith('-') && !str.startsWith('+')) str = '+' + str;
+            
+            const termRegex = /([+-]\d*x\^2|[+-]\d*x(?!\^2)|[+-]\d+)/g;
+            let matches = str.match(termRegex);
+            
+            if (matches) {
+                matches.forEach(term => {
+                    if (term.includes('x^2')) {
+                        let val = term.replace('x^2', '');
+                        a += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+                    } else if (term.includes('x')) {
+                        let val = term.replace('x', '');
+                        b += (val === '+' || val === '') ? 1 : (val === '-' ? -1 : parseInt(val));
+                    } else {
+                        c += parseInt(term);
+                    }
+                });
+            }
+            return { a, b, c };
         }
 
         let expr = input.replace(/\s+/g, '').replace(/²/g, '^2').replace(/[−–—]/g, '-').replace(/x2/g, 'x^2');
