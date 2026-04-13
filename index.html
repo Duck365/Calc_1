@@ -46,7 +46,7 @@
             color: #000;
         }
 
-        /* Screen 2 specific: Chat Interface */
+        /* Screen 2 specific: Terminal Interface */
         #screen-2 {
             display: none; /* Hidden initially */
             flex-direction: column;
@@ -58,7 +58,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px; /* Tighter gap for terminal feel */
         }
 
         .input-container {
@@ -81,25 +81,23 @@
             color: rgba(57, 255, 20, 0.5);
         }
 
-        /* Message Styling */
+        /* Message Styling - All Left Aligned */
         .message-row {
             display: flex;
             width: 100%;
-        }
-
-        .message-row.user {
-            justify-content: flex-end;
-        }
-
-        .message-row.system {
             justify-content: flex-start;
-            flex-direction: column;
         }
 
         .message {
-            max-width: 80%;
+            max-width: 100%;
             word-wrap: break-word;
             line-height: 1.5;
+        }
+
+        /* Error Styling */
+        .error-text {
+            color: #ff3333; /* Red color for errors */
+            font-weight: bold;
         }
 
         .copy-btn {
@@ -110,6 +108,7 @@
             margin-left: 10px;
             border-radius: 3px;
             padding: 2px 6px;
+            font-family: inherit;
         }
 
         .copy-btn:hover {
@@ -121,7 +120,8 @@
             color: #39ff14;
             opacity: 0.6;
             margin-top: 5px;
-            font-size: 0.9rem;
+            margin-bottom: 10px;
+            font-size: 1rem;
         }
     </style>
 </head>
@@ -150,7 +150,7 @@
         const inputField = document.getElementById('math-input');
         const chatBox = document.getElementById('chat-box');
 
-        // Automatically format ^2 to ² as the user types or pastes
+        // Automatically format typed ^2 to ² (Still useful for manual typing)
         inputField.addEventListener('input', function() {
             this.value = this.value.replace(/\^2/g, '²');
         });
@@ -167,44 +167,55 @@
         });
 
         function processQuery(query) {
-            // 1. Show User Input (Top Right)
-            appendMessage(`User: ${query}`, 'user');
+            // 1. Show User Input
+            appendMessage(`User: ${query}`);
 
             // 2. Show "System: Thinking..."
-            const sysContainer = document.createElement('div');
-            sysContainer.className = 'message-row system';
-            const sysMsg = document.createElement('div');
-            sysMsg.className = 'message';
-            sysMsg.innerText = 'System: Thinking...';
-            sysContainer.appendChild(sysMsg);
-            chatBox.appendChild(sysContainer);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            appendMessage(`System: Thinking...`);
 
-            // 3. Calculate answer and update after a short delay for effect
+            // 3. Process answer after a slight delay
             setTimeout(() => {
-                const answer = factorTrinomial(query);
+                const result = factorTrinomial(query);
                 
-                // Update text to answer and add copy button
-                sysMsg.innerHTML = `System: ${answer} <button class="copy-btn" onclick="copyResult(this, '${answer}')">📋 Copy</button>`;
+                const sysContainer = document.createElement('div');
+                sysContainer.className = 'message-row';
+                const sysMsg = document.createElement('div');
+                sysMsg.className = 'message';
+
+                if (result.isError) {
+                    // Generate random error number between 50 and 500
+                    const randNum = Math.floor(Math.random() * (500 - 50 + 1)) + 50;
+                    sysMsg.innerHTML = `System: (<span class="error-text">Error ${randNum}:</span> Invalid Expression) Please type or paste a valid expression.`;
+                } else {
+                    sysMsg.innerHTML = `System: ${result.answer} <button class="copy-btn" onclick="copyResult(this, '${result.answer}')">📋 Copy</button>`;
+                }
                 
-                // Add separator
+                sysContainer.appendChild(sysMsg);
+                chatBox.appendChild(sysContainer);
+                
+                // Add separator line after the answer
+                const separatorRow = document.createElement('div');
+                separatorRow.className = 'message-row';
                 const separator = document.createElement('div');
                 separator.className = 'separator';
                 separator.innerText = '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~';
-                sysContainer.appendChild(separator);
+                separatorRow.appendChild(separator);
+                chatBox.appendChild(separatorRow);
 
+                // Auto-scroll to the bottom
                 chatBox.scrollTop = chatBox.scrollHeight;
             }, 800); // 800ms delay
         }
 
-        function appendMessage(text, sender) {
+        function appendMessage(text) {
             const row = document.createElement('div');
-            row.className = `message-row ${sender}`;
+            row.className = 'message-row';
             const msg = document.createElement('div');
             msg.className = 'message';
             msg.innerText = text;
             row.appendChild(msg);
             chatBox.appendChild(row);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         // Copy logic
@@ -221,11 +232,17 @@
         // Math Logic for Factoring a=1 Trinomials
         function factorTrinomial(input) {
             try {
-                // Normalize string: remove spaces and treat ² as ^2
+                // Remove ALL spaces to fix weird Delta Math copy-pasting
                 let expr = input.replace(/\s+/g, '').replace('²', '^2');
 
+                // If it pastes as "x2", convert it to "x^2"
+                if (expr.startsWith('x2')) {
+                    expr = expr.replace(/^x2/, 'x^2');
+                }
+
+                // Check for validity
                 if (!expr.startsWith('x^2')) {
-                    return "Error: Could not parse. Ensure it starts with x^2 (and a=1).";
+                    return { isError: true };
                 }
 
                 // Strip 'x^2' to isolate bx + c
@@ -251,8 +268,10 @@
                 }
 
                 // Factoring Logic
+                if (isNaN(c)) return { isError: true };
+
                 if (c === 0) {
-                    return `x(x ${b >= 0 ? '+' : '-'} ${Math.abs(b)})`;
+                    return { isError: false, answer: `x(x ${b >= 0 ? '+' : '-'} ${Math.abs(b)})` };
                 }
 
                 for (let i = -Math.abs(c); i <= Math.abs(c); i++) {
@@ -262,13 +281,13 @@
                         if (i + j === b) {
                             let term1 = i >= 0 ? `+ ${i}` : `- ${Math.abs(i)}`;
                             let term2 = j >= 0 ? `+ ${j}` : `- ${Math.abs(j)}`;
-                            return `(x ${term1})(x ${term2})`;
+                            return { isError: false, answer: `(x ${term1})(x ${term2})` };
                         }
                     }
                 }
-                return "Cannot be factored with real integers.";
+                return { isError: true }; // Trigger custom error message if it can't be factored
             } catch (err) {
-                return "Error solving expression.";
+                return { isError: true };
             }
         }
     </script>
